@@ -65,7 +65,7 @@ import ns.flow_monitor
 #ns.core.LogComponentEnable("TcpWestwood", ns.core.LOG_LEVEL_LOGIC)
 #ns.core.LogComponentEnable("TcpTahoe", ns.core.LOG_LEVEL_LOGIC)
 #ns.core.LogComponentEnable("TcpNewReno", ns.core.LOG_LEVEL_LOGIC)
-ns.core.LogComponentEnable("TcpLinuxReno", ns.core.LOG_LEVEL_LOGIC)
+#ns.core.LogComponentEnable("TcpLinuxReno", ns.core.LOG_LEVEL_LOGIC)
 
 
 
@@ -97,7 +97,7 @@ cmd.Parse(sys.argv)
 # CREATE NODES
 
 nodes = ns.network.NodeContainer()
-nodes.Create(6)
+nodes.Create(8)
 
 
 #######################################################################################
@@ -109,7 +109,7 @@ nodes.Create(6)
 
 # Set the default queue length to 5 packets (used by NetDevices)
 # The first line is for older ns3 versions and the second for new versions.
-#ns.core.Config.SetDefault("ns3::DropTailQueue::MaxPackets", ns.core.UintegerValue(5))
+#ns.core.Config.SetDefault("ns3::DropTailQueue::MaxPackets", ns.core.UintegerValue(10))
 #ns.core.Config.SetDefault("ns3::Queue::MaxPackets", ns.core.UintegerValue(5))
 
 
@@ -135,6 +135,14 @@ n4n5 = ns.network.NodeContainer()
 n4n5.Add(nodes.Get(4))
 n4n5.Add(nodes.Get(5))
 
+n6n4 = ns.network.NodeContainer()
+n6n4.Add(nodes.Get(6))
+n6n4.Add(nodes.Get(4))
+
+n7n5 = ns.network.NodeContainer()
+n7n5.Add(nodes.Get(7))
+n7n5.Add(nodes.Get(5))
+
 # create point-to-point helper with common attributes
 pointToPoint = ns.point_to_point.PointToPointHelper()
 pointToPoint.SetDeviceAttribute("Mtu", ns.core.UintegerValue(1500))
@@ -149,12 +157,14 @@ d1d4 = pointToPoint.Install(n1n4)
 d2d5 = pointToPoint.Install(n2n5)
 d3d5 = pointToPoint.Install(n3n5)
 d4d5 = pointToPoint.Install(n4n5)
+d6d4 = pointToPoint.Install(n6n4)
+d7d5 = pointToPoint.Install(n7n5)
 
 # Here we can introduce an error model on the bottle-neck link (from node 4 to 5)
-#em = ns.network.RateErrorModel()
-#em.SetAttribute("ErrorUnit", ns.core.StringValue("ERROR_UNIT_PACKET"))
-#em.SetAttribute("ErrorRate", ns.core.DoubleValue(0.02))
-#d4d5.Get(1).SetReceiveErrorModel(em)
+em = ns.network.RateErrorModel()
+em.SetAttribute("ErrorUnit", ns.core.StringValue("ERROR_UNIT_PACKET"))
+em.SetAttribute("ErrorRate", ns.core.DoubleValue(0.01))
+d4d5.Get(1).SetReceiveErrorModel(em)
 
 
 #######################################################################################
@@ -169,16 +179,19 @@ ns.core.Config.SetDefault("ns3::TcpSocket::SegmentSize", ns.core.UintegerValue(1
 # connections created in the simulator. If you want to simulate different TCP versions
 # at the same time, see below for how to do that.
 ns.core.Config.SetDefault("ns3::TcpL4Protocol::SocketType",
-                          ns.core.StringValue("ns3::TcpLinuxReno"))
-                          #ns.core.StringValue("ns3::TcpNewReno"))
-#                          ns.core.StringValue("ns3::TcpTahoe"))
-#                          ns.core.StringValue("ns3::TcpReno"))
-#                          ns.core.StringValue("ns3::TcpWestwood"))
+                           ns.core.StringValue("ns3::TcpNewReno"))
+                           #ns.core.StringValue("ns3::TcpLinuxReno"))
+                         # ns.core.StringValue("ns3::TcpWestwood"))
+                         #ns.core.StringValue("ns3::TcpWestwoodPlus"))
+
+
+                         # ns.core.StringValue("ns3::TcpTahoe"))
+                         # ns.core.StringValue("ns3::TcpReno"))
 
 # Some examples of attributes for some of the TCP versions.
 #ns.core.Config.SetDefault("ns3::TcpNewReno::ReTxThreshold", ns.core.UintegerValue(4))
-#ns.core.Config.SetDefault("ns3::TcpWestwood::ProtocolType",
-                          #ns.core.StringValue("WestwoodPlus"))
+ns.core.Config.SetDefault("ns3::TcpWestwood::ProtocolType",
+                          ns.core.StringValue("WestwoodPlus"))
 
 
 #######################################################################################
@@ -221,6 +234,12 @@ if3if5 = address.Assign(d3d5)
 
 address.SetBase(ns.network.Ipv4Address("10.1.5.0"), ns.network.Ipv4Mask("255.255.255.0"))
 if4if5 = address.Assign(d4d5)
+
+address.SetBase(ns.network.Ipv4Address("10.1.6.0"), ns.network.Ipv4Mask("255.255.255.0"))
+if6if4 = address.Assign(d6d4)
+
+address.SetBase(ns.network.Ipv4Address("10.1.7.0"), ns.network.Ipv4Mask("255.255.255.0"))
+if7if5 = address.Assign(d7d5)
 
 # Turn on global static routing so we can actually be routed across the network.
 ns.internet.Ipv4GlobalRoutingHelper.PopulateRoutingTables()
@@ -295,6 +314,9 @@ SetupTcpConnection(nodes.Get(0), nodes.Get(2), if2if5.GetAddress(0),
 SetupUdpConnection(nodes.Get(1), nodes.Get(3), if3if5.GetAddress(0),
                    ns.core.Seconds(20.0), ns.core.Seconds(100.0))
 
+SetupUdpConnection(nodes.Get(6), nodes.Get(7), if7if5.GetAddress(0),
+                   ns.core.Seconds(20.0), ns.core.Seconds(100.0))
+
 #######################################################################################
 # CREATE A PCAP PACKET TRACE FILE
 #
@@ -305,11 +327,12 @@ SetupUdpConnection(nodes.Get(1), nodes.Get(3), if3if5.GetAddress(0),
 #
 # You will get two files, one for node 0 and one for node 1
 
-pointToPoint.EnablePcap("sim-tcp", d0d4.Get(0), True)
-pointToPoint.EnablePcap("sim-tcp", d1d4.Get(0), True)
-#pointToPoint.EnablePcap("sim-tcp", d2d5.Get(0), True)
-#pointToPoint.EnablePcap("sim-tcp", d3d5.Get(0), True)
-pointToPoint.EnablePcap("sim-tcp", d4d5.Get(0), True)
+# pointToPoint.EnablePcap("sim", d0d4.Get(0), True)
+# pointToPoint.EnablePcap("sim", d1d4.Get(0), True)
+#pointToPoint.EnablePcap("sim", d2d5.Get(0), True)
+#pointToPoint.EnablePcap("sim", d3d5.Get(0), True)
+pointToPoint.EnablePcap("sim", d4d5.Get(0), True)
+# pointToPoint.EnablePcap("sim", d6d4.Get(0), True)
 
 
 #######################################################################################
