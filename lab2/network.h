@@ -23,7 +23,7 @@
 typedef enum { CMD, ACK } Type;
 
 typedef struct {
-  /* TODO: Declare target according to the protocol. */
+  /* Declare target according to the protocol. */
   uint16_t turn;
   Cmd cmd;
   Type type;

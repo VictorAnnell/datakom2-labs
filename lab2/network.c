@@ -23,7 +23,7 @@
 #include <string.h>
 
 void Serialise(unsigned char *buff, const Packet *pkt) {
-  /* TODO: pack the packet such that it uses network endian and is compact. */
+  /* pack the packet such that it uses network endian and is compact. */
   uint16_t turn = htons(pkt->turn);
   uint8_t cmd = pkt->cmd;
   uint8_t type = pkt->type;
@@ -34,7 +34,7 @@ void Serialise(unsigned char *buff, const Packet *pkt) {
 }
 
 void Assemble(Packet *pkt, const unsigned char *buff) {
-  /* TODO: unpack the packet into the Packet structure. */
+  /* unpack the packet into the Packet structure. */
   uint16_t turn;
   uint8_t cmd, type;
 
